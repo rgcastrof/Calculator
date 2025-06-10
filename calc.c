@@ -39,10 +39,17 @@ calculate(double n1, double n2, const char op)
             break;
         case '/':
             if (n2 == 0) {
-                printf("Error: division by zero.\n");
+                printf("error: division by zero.\n");
                 exit(EXIT_FAILURE);
             }
             result = n1 / n2;
+            break;
+        case '%':
+            if (n2 == 0) {
+                printf("error: division by zero.\n");
+                exit(EXIT_FAILURE);
+            }
+            result = (int)n1 % (int)n2;
             break;
         default:
             fprintf(stderr, "Error: invalid operator '%c'.\n", op);

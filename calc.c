@@ -1,116 +1,158 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
 #include <string.h>
+#include <stdbool.h>
 
+#include "util.h"
 
-// structs
-typedef struct
-{
-    double number_one;
-    double number_two;
-    char operator;
-    double (*calc)(double, double, const char);
-} Calculator;
+// calculator arguments
+typedef struct Arg {
+    char** args; // Array with the arguments readed
+    int size; // Size of arguments
+    double* nums; // Array with the numbers readed
+    char** ops; // Array with the opereators readed
+} Arg;
 
+// Returns a pointer for the arguments struct
+Arg*
+create_calc() {
+    Arg* arg = malloc(sizeof(Arg));
+    arg->args = NULL;
+    arg->size = 0;
+    arg->nums = NULL;
+    arg->ops = NULL;
+    return arg;
+}
 
-// function declarations
-double calculate(double n1, double n2, const char op);
-Calculator createCalc(double n1, double n2, const char op);
-void help(char *arg);
-
-
-//function implementations
-double
-calculate(double n1, double n2, const char op)
-{
-    double result = 0;
-
-    switch (op)
-    {
-        case '+':
-            result = n1 + n2;
-            break;
-        case '-':
-            result = n1 - n2;
-            break;
-        case '*':
-            result = n1 * n2;
-            break;
-        case '/':
-            if (n2 == 0) {
-                printf("error: division by zero.\n");
-                exit(EXIT_FAILURE);
-            }
-            result = n1 / n2;
-            break;
-        case '%':
-            if (n2 == 0) {
-                printf("error: division by zero.\n");
-                exit(EXIT_FAILURE);
-            }
-            result = (int)n1 % (int)n2;
-            break;
-        default:
-            fprintf(stderr, "Error: invalid operator '%c'.\n", op);
-            exit(EXIT_FAILURE);
+// Convert the numbers in the buffer to a array of double
+double*
+append
+(char** str, int total_tokens, int* nums_size) {
+    double* arr = malloc(total_tokens * sizeof(double));
+    int j = 0;
+    for (int i = 0; i < total_tokens; i++) {
+        if (strcmp(str[i], "+") != 0 &&
+            strcmp(str[i], "-") != 0 &&
+            strcmp(str[i], "*") != 0 &&
+            strcmp(str[i], "/") != 0) {
+            arr[j++] = atof(str[i]);
+        }
     }
+    *nums_size = j;
+    return arr;
+}
+
+// Returns an array with only the operators
+char**
+append_ops
+(char** str, int total_tokens, int* ops_size) {
+    char** arr = malloc(total_tokens * sizeof(char*));
+    int j = 0;
+    for (int i = 0; i < total_tokens; i++) {
+    
+        if (strcmp(str[i], "+") == 0 ||
+            strcmp(str[i], "-") == 0 ||
+            strcmp(str[i], "*") == 0 ||
+            strcmp(str[i], "/") == 0) {
+            arr[j++] = str[i];
+        }
+    }
+    *ops_size = j;
+    return arr;
+}
+
+// Returns the result of the operation
+double
+evaluate
+(double* nums, char** ops, int ops_size, int nums_size) {
+    // first loop to evaluate operations with precedence
+    for (int i = 0; i < ops_size;) {
+        if (strcmp(ops[i], "*") == 0 || (strcmp(ops[i], "/") == 0)) {
+            if (strcmp(ops[i], "*") == 0) {
+                nums[i] *= nums[i+1];
+            } else {
+                if (nums[i + 1] == 0) {
+                    fprintf(stderr, "error: division by zero\n");
+                    return 0.0;
+                }
+                nums[i] /= nums[i+1];
+            }
+
+            for (int j = i + 1; j < nums_size - 1; j++) {
+                nums[j] = nums[j+1];
+            }
+            nums_size--;
+            for (int j = i; j < ops_size - 1; j++) {
+                ops[j] = ops[j+1];
+            }
+            ops_size--;
+        } else {
+            i++;
+        }
+    }
+    double result = nums[0];
+    for (int i = 0; i < ops_size; i++) {
+        if (strcmp(ops[i], "+") == 0) {
+            result += nums[i+1];
+        } else if (strcmp(ops[i], "-") == 0) {
+            result -= nums[i+1];
+        }
+    }
+
     return result;
 }
 
-Calculator
-createCalc(double n1, double n2, const char op)
-{
-    Calculator calculator;
-
-    calculator.number_one = n1;
-    calculator.number_two = n2;
-    calculator.operator = op;
-    calculator.calc = calculate;
-
-    return calculator;
-}
-
-void
-help(char *arg)
-{
-    printf("Options:\n%s [number one] [operator] [number two] to calculate a operation between two numbers.\n", arg);
-    printf("%s pow [base] [expoent] to calculate the power of a number.\n", arg);
-    printf("%s sqrt [number] to calculate the square root of a number.\n", arg);
-}
-
 int
-main(int argc, char *argv[])
+main
+(int argc, char *argv[])
 {
-    if (argv[1] != NULL && strcmp(argv[1], "--help") == 0)
-    {
-        help(argv[0]);
+    Arg* arg = create_calc();
+    int nums_size;
+    int ops_size;
+
+    if (argc > 1) {
+        if (strcmp(argv[1], "--help") == 0) {
+            printf("usage: %s \n", argv[0]);
+            printf("The program will start in interactive mode if no expression is specified\n");
+            return EXIT_SUCCESS;
+        }
+        arg->args = malloc((argc - 1) * sizeof(char*));
+        for (int i = 1; i < argc; i++) {
+            arg->args[i - 1] = argv[i];
+        }
+        arg->nums = append(arg->args, argc-1, &nums_size);
+        arg->ops = append_ops(arg->args, argc-2, &ops_size);
+        printf("  %.2f\n", evaluate(arg->nums, arg->ops, ops_size, nums_size));
+        free(arg->args);
+        free(arg->nums);
+        free(arg->ops);
         return EXIT_SUCCESS;
     }
 
-    else if (argv[1] != NULL && strcmp(argv[1], "sqrt") == 0)
-    {
-        printf("sqrt(%.0lf) = %lf\n",strtod(argv[2], NULL), sqrt(strtod(argv[2], NULL)));
-        return EXIT_SUCCESS;
-    }
-    else if (argv[1] != NULL && strcmp(argv[1], "pow") == 0)
-    {
-        double base = strtod(argv[2], NULL);
-        double expoent = strtod(argv[3], NULL);
+    char buffer[100];
 
-        printf("pow(%.0lf, %.0lf) = %.2lf\n", base, expoent, pow(base, expoent));
-        return EXIT_SUCCESS;
-    }
-    else if (argc < 4)
-    {
-        fprintf(stderr, "Usage: %s [number one] [operator] [number two]\n", argv[0]);
-        fprintf(stderr, "\nType %s --help to see a list of options.\n", argv[0]);
-        return EXIT_FAILURE;
-    }
+    while (1) {
+        printf("> ");
+        fgets(buffer, sizeof(buffer), stdin);
+        if (strcmp(buffer, "exit\n") == 0) {
+            break;
+        }
+        printf("%s ", buffer);
+        arg->args = strsplt(buffer);
+        arg->size = spltsize(arg->args);
+        if (!is_digit(arg->args[0])) {
+            fprintf(stderr, "fail: invalid input\ntry with spaces\n");
+            freesplt(arg->args, arg->size);
+            continue;
+        }
 
-    Calculator calculator = createCalc(strtod(argv[1], NULL), strtod(argv[3], NULL), *argv[2]);
-    double result = calculator.calc(calculator.number_one, calculator.number_two, calculator.operator);
+        arg->nums = append(arg->args, arg->size, &nums_size);
+        arg->ops = append_ops(arg->args, arg->size, &ops_size);
+        printf("= %.2f\n", evaluate(arg->nums, arg->ops, ops_size, nums_size));
 
-    printf("%s %s %s = %.2lf\n", argv[1], argv[2], argv[3], result);
-    return EXIT_SUCCESS;
+        free(arg->nums);
+        free(arg->ops);
+        freesplt(arg->args, arg->size);
+    }
+    return 0;
 }
